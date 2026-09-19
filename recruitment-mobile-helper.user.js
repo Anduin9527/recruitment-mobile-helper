@@ -7,10 +7,10 @@
 // @supportURL   https://github.com/Anduin9527/recruitment-mobile-helper/issues
 // @downloadURL  https://raw.githubusercontent.com/Anduin9527/recruitment-mobile-helper/main/recruitment-mobile-helper.user.js
 // @updateURL    https://raw.githubusercontent.com/Anduin9527/recruitment-mobile-helper/main/recruitment-mobile-helper.user.js
-// @version      1.2.3
+// @version      1.2.4
 // @description  点击后填写手机号并获取验证码；税友 campus 同时勾选隐私协议。不填写验证码、不提交登录。
 // @match        https://*.zhiye.com/login*
-// @match        https://campus.servyou.com.cn/*
+// @match        https://campus.servyou.com.cn/campus-recruitment/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
@@ -22,8 +22,16 @@
   'use strict';
 
   const validMobile = value => /^1[3-9]\d{9}$/.test(value);
-  const visible = el => el.isConnected && el.getClientRects().length > 0 &&
-    getComputedStyle(el).visibility !== 'hidden';
+  const visible = el => {
+    if (!el || !el.isConnected || !el.getClientRects().length) return false;
+    for (let node = el; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (node.hidden || node.getAttribute('aria-hidden') === 'true' ||
+          style.display === 'none' || style.visibility === 'hidden' ||
+          style.visibility === 'collapse' || Number(style.opacity) === 0) return false;
+    }
+    return true;
+  };
   const marker = 'data-zhiye-mobile-helper';
   const mounted = new Map();
   let busy = false;
@@ -65,7 +73,16 @@
   function scopeFor(input, currentSite) {
     if (currentSite === 'campus') {
       // Moka 弹窗的类名带构建哈希，只使用稳定的组件名前缀。
-      return input.closest('[class*="sd-Modal-content-"], [role="dialog"]') || input.parentElement;
+      const modal = input.closest('[class*="sd-Modal-content-"], [role="dialog"]');
+      // 普通简历表单也可能使用相同 placeholder；必须确认是手机号登录弹窗。
+      if (!visible(modal) || !visible(input)) return null;
+      const text = modal.textContent;
+      const code = modal.querySelector('input[placeholder="请输入验证码"]');
+      const login = Array.from(modal.querySelectorAll('button,[role="button"]'))
+        .some(el => visible(el) && el.textContent.trim() === '登录');
+      if (!text.includes('手机号登录') || !text.includes('隐私协议') ||
+          !visible(code) || !login) return null;
+      return modal;
     }
     return input.closest('[role="dialog"], form') || document;
   }
@@ -79,7 +96,8 @@
   async function run(input, trigger) {
     if (busy) return;
     const currentSite = site();
-    if (!currentSite) return;
+    if (!currentSite || !scopeFor(input, currentSite)) return;
+    const startURL = location.href;
     busy = true;
     trigger.disabled = true;
     let success = false;
@@ -102,7 +120,7 @@
       input.dispatchEvent(new Event('change', { bubbles: true }));
       input.blur();
       await new Promise(resolve => setTimeout(resolve, 800));
-      if (site() !== currentSite || !visible(input) || scopeFor(input, currentSite) !== scope) return;
+      if (location.href !== startURL || site() !== currentSite || !visible(input) || scopeFor(input, currentSite) !== scope) return;
       if (input.value !== mobile) {
         alert('页面未保留填入的手机号，请手动检查。');
         return;
@@ -125,7 +143,7 @@
           agreement.click();
           await new Promise(resolve => setTimeout(resolve, 300));
         }
-        if (site() !== currentSite || !visible(input) || input.value !== mobile ||
+        if (location.href !== startURL || site() !== currentSite || !visible(input) || input.value !== mobile ||
             scopeFor(input, currentSite) !== scope) return;
         const checked = Array.from(scope.querySelectorAll('input[type="checkbox"]'))
           .filter(el => visible(el.closest('label') || el));
@@ -210,8 +228,10 @@
   }
 
   const reposition = () => {
-    if (site() === 'campus') for (const [input, trigger] of mounted) position(input, trigger);
+    mount();
   };
+  window.addEventListener('hashchange', mount);
+  window.addEventListener('popstate', mount);
   window.addEventListener('resize', reposition);
   document.addEventListener('scroll', reposition, true);
 
