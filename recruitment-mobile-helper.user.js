@@ -7,10 +7,9 @@
 // @supportURL   https://github.com/Anduin9527/recruitment-mobile-helper/issues
 // @downloadURL  https://raw.githubusercontent.com/Anduin9527/recruitment-mobile-helper/main/recruitment-mobile-helper.user.js
 // @updateURL    https://raw.githubusercontent.com/Anduin9527/recruitment-mobile-helper/main/recruitment-mobile-helper.user.js
-// @version      1.2.5
-// @description  点击后填写手机号并获取验证码；Moka 招聘弹窗同时勾选隐私协议（目前适配税友站点）。不填写验证码、不提交登录。
-// @match        https://*.zhiye.com/login*
-// @match        https://campus.servyou.com.cn/campus-recruitment/*
+// @version      1.3.0
+// @description  点击后填写手机号并获取验证码；Moka 招聘弹窗同时勾选隐私协议。不填写验证码、不提交登录。
+// @match        https://*/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
@@ -40,7 +39,9 @@
     if (/(^|\.)zhiye\.com$/i.test(location.hostname) && /^\/login(?:\/|$)/i.test(location.pathname)) {
       return 'zhiye';
     }
-    if (location.hostname === 'campus.servyou.com.cn' && location.pathname.startsWith('/campus-recruitment/')) {
+    // 企业自定义域名不固定；先识别 Moka 平台，再由 scopeFor 验证登录弹窗。
+    if (document.querySelector('input#moka-version[data-version]') ||
+        /(^|\.)mokahr\.com$/i.test(location.hostname)) {
       return 'moka';
     }
     return null;
@@ -73,7 +74,7 @@
   function scopeFor(input, currentSite) {
     if (currentSite === 'moka') {
       // Moka 弹窗的类名带构建哈希，只使用稳定的组件名前缀。
-      const modal = input.closest('[class*="sd-Modal-content-"], [role="dialog"]');
+      const modal = input.closest('[class*="sd-Modal-content-"]');
       // 普通简历表单也可能使用相同 placeholder；必须确认是手机号登录弹窗。
       if (!visible(modal) || !visible(input)) return null;
       const text = modal.textContent;
