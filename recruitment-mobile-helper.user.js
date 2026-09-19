@@ -7,8 +7,8 @@
 // @supportURL   https://github.com/Anduin9527/recruitment-mobile-helper/issues
 // @downloadURL  https://raw.githubusercontent.com/Anduin9527/recruitment-mobile-helper/main/recruitment-mobile-helper.user.js
 // @updateURL    https://raw.githubusercontent.com/Anduin9527/recruitment-mobile-helper/main/recruitment-mobile-helper.user.js
-// @version      1.2.4
-// @description  点击后填写手机号并获取验证码；税友 campus 同时勾选隐私协议。不填写验证码、不提交登录。
+// @version      1.2.5
+// @description  点击后填写手机号并获取验证码；Moka 招聘弹窗同时勾选隐私协议（目前适配税友站点）。不填写验证码、不提交登录。
 // @match        https://*.zhiye.com/login*
 // @match        https://campus.servyou.com.cn/campus-recruitment/*
 // @grant        GM_getValue
@@ -41,7 +41,7 @@
       return 'zhiye';
     }
     if (location.hostname === 'campus.servyou.com.cn' && location.pathname.startsWith('/campus-recruitment/')) {
-      return 'campus';
+      return 'moka';
     }
     return null;
   }
@@ -60,7 +60,7 @@
 
   GM_registerMenuCommand('设置 / 修改预设手机号', configure);
   GM_registerMenuCommand('清除预设手机号', () => GM_setValue('mobile', ''));
-  GM_registerMenuCommand('填写手机号并获取验证码（campus 同时同意隐私协议）', () => {
+  GM_registerMenuCommand('填写手机号并获取验证码（Moka 同时同意隐私协议）', () => {
     mount();
     const entries = [...mounted].filter(([input]) => visible(input));
     if (entries.length !== 1) {
@@ -71,7 +71,7 @@
   });
 
   function scopeFor(input, currentSite) {
-    if (currentSite === 'campus') {
+    if (currentSite === 'moka') {
       // Moka 弹窗的类名带构建哈希，只使用稳定的组件名前缀。
       const modal = input.closest('[class*="sd-Modal-content-"], [role="dialog"]');
       // 普通简历表单也可能使用相同 placeholder；必须确认是手机号登录弹窗。
@@ -126,7 +126,7 @@
         return;
       }
 
-      if (currentSite === 'campus') {
+      if (currentSite === 'moka') {
         const agreements = Array.from(scope.querySelectorAll('input[type="checkbox"]'))
           .filter(el => visible(el.closest('label') || el));
         if (!scope.textContent.includes('首次登录会自动创建新账号') ||
@@ -180,7 +180,7 @@
     } finally {
       busy = false;
       trigger.disabled = false;
-      if (!success) setStatus(trigger, 'ϟ', currentSite === 'campus' ? '填写手机号、同意隐私协议并获取验证码' : '填手机号并获取验证码');
+      if (!success) setStatus(trigger, 'ϟ', currentSite === 'moka' ? '填写手机号、同意隐私协议并获取验证码' : '填手机号并获取验证码');
     }
   }
 
@@ -190,7 +190,7 @@
       if (!currentSite || !visible(input) || !trigger.isConnected || !scopeFor(input, currentSite)) {
         trigger.remove();
         mounted.delete(input);
-      } else if (currentSite === 'campus') {
+      } else if (currentSite === 'moka') {
         position(input, trigger);
       }
     }
@@ -200,14 +200,14 @@
       const trigger = document.createElement('button');
       trigger.type = 'button';
       trigger.setAttribute(marker, 'true');
-      setStatus(trigger, 'ϟ', currentSite === 'campus' ? '填写手机号、同意隐私协议并获取验证码' : '填手机号并获取验证码');
+      setStatus(trigger, 'ϟ', currentSite === 'moka' ? '填写手机号、同意隐私协议并获取验证码' : '填手机号并获取验证码');
       trigger.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;position:relative;z-index:10;width:26px;height:26px;min-width:26px;min-height:26px;box-sizing:border-box;margin:4px 0;padding:0;border:0;border-radius:50%;background:#eff6ff;color:#2563eb;font-family:Arial,sans-serif;font-size:20px;font-weight:600;line-height:1;cursor:pointer;vertical-align:middle;';
       trigger.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
         void run(input, trigger);
       });
-      if (currentSite === 'campus') {
+      if (currentSite === 'moka') {
         // 独立浮层不参与弹窗布局，避免被输入框父容器裁切。
         trigger.style.cssText = 'all:initial!important;position:fixed!important;z-index:2147483647!important;display:flex!important;align-items:center!important;justify-content:center!important;width:30px!important;height:30px!important;box-sizing:border-box!important;border:1px solid #93c5fd!important;border-radius:50%!important;background:#eff6ff!important;color:#2563eb!important;font:600 22px/1 Arial,sans-serif!important;cursor:pointer!important;pointer-events:auto!important;box-shadow:0 1px 5px #0002!important;';
         document.body.appendChild(trigger);
